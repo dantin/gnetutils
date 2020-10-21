@@ -23,7 +23,7 @@ var (
 	wg          sync.WaitGroup
 )
 
-// parseArgs parses command line arguments.
+// client sends message to server.
 func client(ctx context.Context) {
 	defer wg.Done()
 
