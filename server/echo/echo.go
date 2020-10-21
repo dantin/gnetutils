@@ -86,12 +86,12 @@ func (s *Server) serverLoop(ctx context.Context, listenAddr string) {
 		if err != nil {
 			log.Fatalf("error while accepting: %s", err)
 		}
-		log.Printf("Client connected, peer IP %s", c.RemoteAddr())
+		log.Printf("client connected, peer IP %s", c.RemoteAddr())
 		go s.clientLoop(ctx, c)
 	}
 }
 
-// Run runs EchoServer until either a stop signal is received or an error occurs.
+// Run runs echo server until either a stop signal is received or an error occurs.
 func (s *Server) Run() error {
 	var (
 		showVersion bool
