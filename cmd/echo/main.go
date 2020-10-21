@@ -4,11 +4,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/dantin/gnetutils/tools"
+	"github.com/dantin/gnetutils/server/echo"
 )
 
 func main() {
-	app := tools.NewEchoServer(os.Args)
+	app := echo.New(os.Args)
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}

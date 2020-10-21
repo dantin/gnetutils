@@ -1,4 +1,4 @@
-package tools
+package echo
 
 import (
 	"bufio"
@@ -12,38 +12,27 @@ import (
 	"os/signal"
 	"sync/atomic"
 	"syscall"
-	"time"
 )
 
 const (
-	echoServerVersion = "0.0.1-dev"
+	version = "0.0.1-dev"
 )
 
-// EchoServer encapsulates a TCP echo server application.
-type EchoServer struct {
-	args             []string
-	shutdownWaitSecs time.Duration
-	watchStopCh      chan os.Signal
+// Server encapsulates a TCP echo server application.
+type Server struct {
+	args        []string
+	watchStopCh chan os.Signal
 }
 
-// NewEchoServer returns a runnable EchoServer given a command line arguments array.
-func NewEchoServer(args []string) *EchoServer {
-	// setup shutdown handler.
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT,
-	)
-
-	return &EchoServer{
+// New returns a runnable echo server given a command line arguments array.
+func New(args []string) *Server {
+	return &Server{
 		args:        args,
-		watchStopCh: sc,
+		watchStopCh: make(chan os.Signal, 1),
 	}
 }
 
-func (es *EchoServer) clientLoop(ctx context.Context, c net.Conn) {
+func (s *Server) clientLoop(ctx context.Context, c net.Conn) {
 	defer c.Close()
 
 	var done uint64
@@ -74,7 +63,7 @@ func (es *EchoServer) clientLoop(ctx context.Context, c net.Conn) {
 	}
 }
 
-func (es *EchoServer) serverLoop(ctx context.Context, listenAddr string) {
+func (s *Server) serverLoop(ctx context.Context, listenAddr string) {
 	l, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		log.Fatalf("error while listening: %s", listenAddr)
@@ -98,12 +87,12 @@ func (es *EchoServer) serverLoop(ctx context.Context, listenAddr string) {
 			log.Fatalf("error while accepting: %s", err)
 		}
 		log.Printf("Client connected, peer IP %s", c.RemoteAddr())
-		go es.clientLoop(ctx, c)
+		go s.clientLoop(ctx, c)
 	}
 }
 
 // Run runs EchoServer until either a stop signal is received or an error occurs.
-func (es *EchoServer) Run() error {
+func (s *Server) Run() error {
 	var (
 		showVersion bool
 		showUsage   bool
@@ -114,10 +103,10 @@ func (es *EchoServer) Run() error {
 	fs.BoolVar(&showVersion, "v", false, "Print version information.")
 	fs.BoolVar(&showUsage, "h", false, "Show help message.")
 	fs.StringVar(&listenAddr, "l", ":8080", "Listening address, default(:8080).")
-	_ = fs.Parse(es.args[1:])
+	_ = fs.Parse(s.args[1:])
 
 	if showVersion {
-		fmt.Println(echoServerVersion)
+		fmt.Println(version)
 		return nil
 	}
 
@@ -126,12 +115,21 @@ func (es *EchoServer) Run() error {
 		return nil
 	}
 
+	// setup shutdown handler.
+	signal.Notify(s.watchStopCh,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+
+	// start server loop.
 	ctx, cancel := context.WithCancel(context.Background())
-	go es.serverLoop(ctx, listenAddr)
+	go s.serverLoop(ctx, listenAddr)
 
 	for {
 		select {
-		case s := <-es.watchStopCh:
+		case s := <-s.watchStopCh:
 			log.Printf("signal %v received, waiting for server to exit.", s)
 			cancel()
 			log.Printf("exiting...")
