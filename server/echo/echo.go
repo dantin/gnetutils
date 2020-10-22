@@ -32,10 +32,13 @@ func New(args []string) *Server {
 	}
 }
 
-func (s *Server) clientLoop(ctx context.Context, c net.Conn) {
+func (s *Server) clientLoop(ctx context.Context, c net.Conn, connNo uint64) {
 	defer c.Close()
 
-	var done uint64
+	var (
+		done   uint64
+		connID = fmt.Sprintf("%d (%s <-> %s)", connNo, c.LocalAddr(), c.RemoteAddr())
+	)
 
 	go func() {
 		<-ctx.Done()
@@ -53,6 +56,7 @@ func (s *Server) clientLoop(ctx context.Context, c net.Conn) {
 			if err != io.EOF {
 				log.Printf("error while reading line: %s", err)
 			}
+			log.Printf("connection destroyed %s", connID)
 			return
 		}
 
@@ -70,7 +74,10 @@ func (s *Server) serverLoop(ctx context.Context, listenAddr string) {
 	}
 	log.Printf("TCP server is listening on %s", listenAddr)
 
-	var done uint64
+	var (
+		done   uint64
+		connNo uint64
+	)
 
 	go func() {
 		<-ctx.Done()
@@ -86,8 +93,11 @@ func (s *Server) serverLoop(ctx context.Context, listenAddr string) {
 		if err != nil {
 			log.Fatalf("error while accepting: %s", err)
 		}
-		log.Printf("client connected, peer IP %s", c.RemoteAddr())
-		go s.clientLoop(ctx, c)
+		log.Printf("connection accepted %d (%s <-> %s)", connNo, c.RemoteAddr(), c.LocalAddr())
+
+		go s.clientLoop(ctx, c, connNo)
+
+		connNo++
 	}
 }
 
